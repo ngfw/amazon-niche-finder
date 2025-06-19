@@ -12,14 +12,19 @@ A Python tool to discover low-competition niches on Amazon by analyzing search s
 
 ## Installation
 
+## Installation
+
 ```bash
 # Clone the repository
 git clone https://github.com/ngfw/amazon-niche-finder.git
 cd amazon-niche-finder
 
-# Install required packages
+# (Recommended) Create and activate a virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
-```
 
 ## Usage
 
@@ -30,7 +35,7 @@ python amazon_search.py
 
 Specify your own seed keyword:
 ```bash
-python amazon_search.py --seed "recipe book for"
+python amazon_search.py --seed "bold and easy"
 ```
 
 ## Example Output
@@ -84,3 +89,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Disclaimer
 
 This tool is for educational purposes only. Be sure to comply with Amazon's terms of service and implement appropriate rate limiting when using this tool.
+
+There is no guarantee that any discovered niche will sell or is the right niche for you. Use this tool and any results at your own risk.

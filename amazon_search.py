@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
 Amazon Niche Finder - Discover low-competition niches on Amazon.
-Author: Your Name
+Author: Nick G.
+Version: 1.0
+Website: gm-sunshine.com
 License: MIT
 """
 
@@ -194,11 +196,16 @@ if __name__ == "__main__":
         low_comp = [r for r in niche_results if 0 < r[1] < args.threshold]
         
         print(f"\n💡 Low Competition Niches (under {args.threshold} results):")
-        if low_comp:
-            for keyword, count in sorted(low_comp, key=lambda x: x[1]):
-                print(f"{keyword} → {count:,} results")
-        else:
-            print("No low-competition niches found. Try a different seed keyword or increase the threshold.")
+        # Log to a separate file
+        with open('discovered_niches.log', 'a', encoding='utf-8') as f:
+            f.write(f"\n💡 Low Competition Niches (under {args.threshold} results):\n")
+            if low_comp:
+                for keyword, count in sorted(low_comp, key=lambda x: x[1]):
+                    line = f"{keyword} → {count:,} results\n"
+                    print(line, end='')
+                    f.write(line)
+            else:
+                print("No low-competition niches found. Try a different seed keyword or increase the threshold.")
             
     except KeyboardInterrupt:
         print("\nOperation cancelled by user.")

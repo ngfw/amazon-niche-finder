@@ -25,7 +25,7 @@ source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
-
+```
 ## Usage
 
 Basic usage with default seed keyword ("coloring book for"):

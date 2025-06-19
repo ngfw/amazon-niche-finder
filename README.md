@@ -41,7 +41,6 @@ python amazon_search.py --seed "bold and easy"
 ## Example Output
 
 ```
-🔍 Seed: coloring book for
 INFO - 🔍 Seed: bold and easy
 INFO - bold and easy coloring book → 10000 results
 INFO - bold and easy coloring book for adult → 9000 results

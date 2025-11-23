@@ -6,10 +6,12 @@ A powerful Python tool to discover **profitable, low-competition niches** on Ama
 
 The tool has been completely redesigned to be **actually useful** for finding profitable niches:
 
+- **Competitor Strength Analysis**: Analyzes actual competitors - detects Amazon brands, major brands, and identifies weak competition
 - **Multi-Level Recursive Exploration**: Automatically explores keyword trees 2-3 levels deep to find hidden niches
 - **Comprehensive Product Analysis**: Analyzes prices, reviews, ratings, bestseller badges, and more
-- **Smart Scoring System**: Ranks niches based on competition, revenue potential, demand, and specificity
+- **Smart Scoring System**: Ranks niches based on competition, competitor strength, revenue potential, demand, and specificity
 - **Multiple Category Support**: Search across 10+ Amazon categories (not just books!)
+- **Market Intelligence**: Identifies market concentration, barrier to entry, and opportunity levels
 - **Price & Demand Filtering**: Filter by price range and analyze actual demand indicators
 - **Real-Time Progress Tracking**: See exploration progress with live updates and score previews
 - **Professional Export Options**: Export results to CSV or JSON for further analysis
@@ -33,10 +35,20 @@ The tool has been completely redesigned to be **actually useful** for finding pr
 
 ### Advanced Scoring Algorithm
 Each niche gets a weighted overall score (0-100) based on:
-- **35%** Competition (lower is better, but not too low)
-- **25%** Price/Revenue Potential (higher is better)
-- **20%** Demand Indicators (moderate is best)
-- **20%** Specificity (more specific = better niche)
+- **30%** Competition (lower is better, but not too low)
+- **20%** Competitor Strength (weaker competitors = better opportunity)
+- **20%** Price/Revenue Potential (higher is better)
+- **15%** Demand Indicators (moderate is best)
+- **15%** Specificity (more specific = better niche)
+
+### Competitor Strength Analysis
+**NEW!** Analyzes the actual competitors in each niche:
+- **Brand Detection**: Identifies Amazon-owned brands and major established brands
+- **Market Concentration**: Determines if market is monopolized, concentrated, or diverse
+- **Barrier to Entry**: Calculates how hard it is to compete (low/medium/high/very_high)
+- **Competitor Reviews**: Tracks average review counts to gauge competition strength
+- **Small Seller Count**: Identifies niches with many small independent sellers
+- **Opportunity Level**: Rates opportunity as excellent/good/moderate/poor
 
 ### Multi-Category Support
 Search across 10+ Amazon categories:
@@ -175,6 +187,12 @@ Price Range: $15.00 - $50.00
    Rating: 4.6/5.0 stars
    🏆 2 bestseller(s) in results
    Specificity: 87.5 (more specific = better niche)
+   🟢 Competitor Strength: 78.5/100 (GOOD opportunity)
+      ✅ Small Sellers: 15/20 products
+      Market: Diverse
+      Barrier to Entry: Low
+      Top Brands: CustomGifts, PersonalCreations, GiftPro
+      Avg Competitor Reviews: 145
    Depth: Level 2
    Parent: coffee mug for mom
 
@@ -196,6 +214,9 @@ Price Range: $15.00 - $50.00
 
 💡 RECOMMENDATIONS:
 
+   ⭐ BEST OVERALL: personalized coffee mug for mom
+      └─ Score: 86.7/100
+
    💰 Best Revenue Potential: ceramic coffee mug set
       └─ $31.99 avg price
 
@@ -204,6 +225,9 @@ Price Range: $15.00 - $50.00
 
    🔥 Best Demand Indicators: travel coffee mug insulated
       └─ 234 avg reviews, 3 bestsellers
+
+   🥊 Weakest Competitors: personalized coffee mug for mom
+      └─ 15/20 small sellers, low barrier to entry
 
 📋 NEXT STEPS:
    1. Research top niches on Amazon manually to validate
@@ -249,6 +273,20 @@ Based on review counts and bestseller badges:
 Longer, more specific keywords are better niches:
 - Higher word count = more specific = less competition
 - Longer character count = more detailed = better targeting
+
+### Competitor Strength Score (NEW!)
+Analyzes who you're actually competing against (0-100, higher = weaker competition):
+- **80-100**: Mostly small sellers with low reviews - excellent opportunity
+- **60-79**: Mix of small/medium sellers - good opportunity
+- **40-59**: Some major brands present - moderate difficulty
+- **0-39**: Dominated by Amazon/major brands - very difficult
+
+**Factors analyzed:**
+- Amazon-owned brands (Amazon Basics, Solimo, etc.) - major penalty
+- Major established brands (Nike, Sony, KitchenAid, etc.) - moderate penalty
+- Average competitor reviews (higher = harder to compete)
+- Market concentration (monopolized vs diverse)
+- Small seller presence (more small sellers = better opportunity)
 
 ## How It Works
 

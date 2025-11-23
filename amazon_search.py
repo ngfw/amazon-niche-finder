@@ -38,10 +38,11 @@ MAX_PRODUCTS_TO_ANALYZE = 20  # Maximum products to analyze
 
 # Niche scoring weights
 SCORE_WEIGHTS = {
-    'competition': 0.35,      # Lower competition is better
-    'price': 0.25,            # Higher price is better (more revenue potential)
-    'reviews': 0.20,          # Moderate reviews is best (demand exists, not saturated)
-    'specificity': 0.20       # More specific keywords are better
+    'competition': 0.30,      # Lower competition is better
+    'price': 0.20,            # Higher price is better (more revenue potential)
+    'reviews': 0.15,          # Moderate reviews is best (demand exists, not saturated)
+    'specificity': 0.15,      # More specific keywords are better
+    'competitor_strength': 0.20  # Weaker competitors = better opportunity
 }
 
 # Amazon categories to explore
@@ -57,6 +58,29 @@ CATEGORIES = {
     'office': 'office-products',
     'arts': 'arts-crafts',
     'all': 'aps'
+}
+
+# Amazon-owned and major brands (harder to compete against)
+AMAZON_BRANDS = {
+    'amazon basics', 'amazonbasics', 'amazon essentials', 'amazon elements',
+    'amazon commercial', 'amazon brand', 'solimo', 'presto!', 'mama bear',
+    'happy belly', 'wickedly prime', 'goodthreads', 'amazon collection',
+    'stone & beam', 'rivet', 'pinzon', 'spotted zebra', 'simple joys',
+    'amazon aware', 'core 10', 'daily ritual', 'find.', 'iris & lilly',
+    'mae', 'peak velocity', '28 palms', '206 collective', 'lark & ro',
+    'buttoned down'
+}
+
+# Major established brands (high competition)
+MAJOR_BRANDS = {
+    'nike', 'adidas', 'apple', 'samsung', 'sony', 'lg', 'panasonic',
+    'logitech', 'hp', 'dell', 'microsoft', 'google', 'bose', 'jbl',
+    'kitchenaid', 'cuisinart', 'ninja', 'instant pot', 'vitamix',
+    'dyson', 'shark', 'bissell', 'black+decker', 'stanley', 'yeti',
+    'contigo', 'thermos', 'lego', 'mattel', 'hasbro', 'fisher-price',
+    'melissa & doug', 'crayola', 'sharpie', 'scotch', '3m', 'post-it',
+    'elmer\'s', 'avery', 'rubbermaid', 'tupperware', 'pyrex', 'corning',
+    'clorox', 'lysol', 'tide', 'downy', 'bounty', 'charmin'
 }
 
 # Configure logging
@@ -89,6 +113,29 @@ class ProductData:
     is_bestseller: bool = False
     is_sponsored: bool = False
     title: Optional[str] = None
+    brand: Optional[str] = None
+    is_amazon_brand: bool = False
+    is_major_brand: bool = False
+
+@dataclass
+class CompetitorAnalysis:
+    """Competitor strength analysis for a niche"""
+    total_competitors: int = 0
+    amazon_brand_count: int = 0
+    major_brand_count: int = 0
+    small_seller_count: int = 0
+    avg_competitor_reviews: Optional[int] = None
+    avg_competitor_rating: Optional[float] = None
+    top_competitor_reviews: Optional[int] = None  # Reviews of #1 competitor
+    market_concentration: str = "unknown"  # "monopolized", "concentrated", "diverse"
+    barrier_to_entry: str = "unknown"  # "low", "medium", "high", "very_high"
+    opportunity_level: str = "unknown"  # "excellent", "good", "moderate", "poor"
+    competitor_strength_score: float = 50.0  # 0-100, higher = weaker competition (better for you)
+    dominant_brands: List[str] = None
+
+    def __post_init__(self):
+        if self.dominant_brands is None:
+            self.dominant_brands = []
 
 @dataclass
 class NicheData:
@@ -105,15 +152,27 @@ class NicheData:
     competition_score: float = 0.0
     price_score: float = 0.0
     demand_score: float = 0.0
+    competitor_score: float = 0.0
     overall_score: float = 0.0
     depth_level: int = 1
     parent_keyword: Optional[str] = None
+    competitor_analysis: Optional[CompetitorAnalysis] = None
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for export"""
         data = asdict(self)
         if self.price_range:
             data['price_range'] = f"${self.price_range[0]:.2f} - ${self.price_range[1]:.2f}"
+        # Flatten competitor analysis for CSV export
+        if self.competitor_analysis:
+            comp = self.competitor_analysis
+            data['amazon_brand_count'] = comp.amazon_brand_count
+            data['major_brand_count'] = comp.major_brand_count
+            data['small_seller_count'] = comp.small_seller_count
+            data['market_concentration'] = comp.market_concentration
+            data['barrier_to_entry'] = comp.barrier_to_entry
+            data['opportunity_level'] = comp.opportunity_level
+            data['dominant_brands'] = ', '.join(comp.dominant_brands) if comp.dominant_brands else ''
         return data
 
 class NicheFinder:
@@ -204,6 +263,44 @@ class NicheFinder:
             logger.error(f"Error fetching suggestions for '{seed}': {str(e)}")
             return []
 
+    def _extract_brand(self, title: str) -> Optional[str]:
+        """Extract brand name from product title"""
+        if not title:
+            return None
+
+        # Common patterns: "Brand Name - Product" or "Brand Name Product"
+        # Usually brand is first 1-3 words before special chars or "by"
+        title_lower = title.lower()
+
+        # Try to find brand after "by " pattern
+        by_match = re.search(r'\bby\s+([A-Za-z0-9\s&\-\'\.]+?)(?:\s+[-|,]|\s*$)', title)
+        if by_match:
+            return by_match.group(1).strip()
+
+        # Otherwise, take first 1-3 words before dash, pipe, or comma
+        parts = re.split(r'\s*[-|,]\s*', title)
+        if parts:
+            brand_candidate = parts[0].strip()
+            # Limit to first 3 words max
+            words = brand_candidate.split()[:3]
+            return ' '.join(words) if words else None
+
+        return None
+
+    def _is_amazon_brand(self, brand: Optional[str]) -> bool:
+        """Check if brand is Amazon-owned"""
+        if not brand:
+            return False
+        brand_lower = brand.lower().strip()
+        return brand_lower in AMAZON_BRANDS
+
+    def _is_major_brand(self, brand: Optional[str]) -> bool:
+        """Check if brand is a major established brand"""
+        if not brand:
+            return False
+        brand_lower = brand.lower().strip()
+        return brand_lower in MAJOR_BRANDS
+
     def analyze_products(self, keyword: str, soup: BeautifulSoup) -> List[ProductData]:
         """Extract product data from search results page"""
         products = []
@@ -219,6 +316,11 @@ class NicheFinder:
                 title_elem = card.find("h2", {"class": "s-line-clamp-2"})
                 if title_elem:
                     product.title = title_elem.get_text(strip=True)
+
+                    # Extract brand from title
+                    product.brand = self._extract_brand(product.title)
+                    product.is_amazon_brand = self._is_amazon_brand(product.brand)
+                    product.is_major_brand = self._is_major_brand(product.brand)
 
                 # Extract price
                 price_whole = card.find("span", {"class": "a-price-whole"})
@@ -262,6 +364,117 @@ class NicheFinder:
             logger.error(f"Error analyzing products for '{keyword}': {str(e)}")
 
         return products
+
+    def analyze_competitors(self, products: List[ProductData]) -> CompetitorAnalysis:
+        """Analyze competitor strength from product list"""
+        if not products:
+            return CompetitorAnalysis()
+
+        analysis = CompetitorAnalysis()
+        analysis.total_competitors = len(products)
+
+        # Count brand types
+        brand_counts = defaultdict(int)
+        for product in products:
+            if product.brand:
+                brand_counts[product.brand] += 1
+
+            if product.is_amazon_brand:
+                analysis.amazon_brand_count += 1
+            elif product.is_major_brand:
+                analysis.major_brand_count += 1
+            else:
+                analysis.small_seller_count += 1
+
+        # Calculate averages
+        reviews = [p.review_count for p in products if p.review_count]
+        if reviews:
+            analysis.avg_competitor_reviews = int(sum(reviews) / len(reviews))
+            analysis.top_competitor_reviews = max(reviews)
+
+        ratings = [p.rating for p in products if p.rating]
+        if ratings:
+            analysis.avg_competitor_rating = sum(ratings) / len(ratings)
+
+        # Identify dominant brands (top 3)
+        if brand_counts:
+            sorted_brands = sorted(brand_counts.items(), key=lambda x: x[1], reverse=True)
+            analysis.dominant_brands = [brand for brand, count in sorted_brands[:3]]
+
+        # Determine market concentration
+        if analysis.amazon_brand_count >= analysis.total_competitors * 0.5:
+            analysis.market_concentration = "monopolized"  # 50%+ Amazon
+        elif analysis.amazon_brand_count + analysis.major_brand_count >= analysis.total_competitors * 0.7:
+            analysis.market_concentration = "concentrated"  # 70%+ big brands
+        elif len(brand_counts) >= analysis.total_competitors * 0.7:
+            analysis.market_concentration = "diverse"  # Many different brands
+        else:
+            analysis.market_concentration = "moderate"
+
+        # Determine barrier to entry
+        avg_reviews = analysis.avg_competitor_reviews or 0
+        has_amazon = analysis.amazon_brand_count > 0
+        has_major = analysis.major_brand_count > 0
+
+        if has_amazon and avg_reviews > 1000:
+            analysis.barrier_to_entry = "very_high"
+        elif (has_amazon or has_major) and avg_reviews > 500:
+            analysis.barrier_to_entry = "high"
+        elif avg_reviews > 200 or has_major:
+            analysis.barrier_to_entry = "medium"
+        else:
+            analysis.barrier_to_entry = "low"
+
+        # Calculate competitor strength score (higher = weaker competitors = better for you)
+        score = 100.0
+
+        # Penalize for Amazon presence (big penalty)
+        if analysis.amazon_brand_count > 0:
+            amazon_ratio = analysis.amazon_brand_count / analysis.total_competitors
+            score -= amazon_ratio * 40  # Up to -40 points
+
+        # Penalize for major brands (moderate penalty)
+        if analysis.major_brand_count > 0:
+            major_ratio = analysis.major_brand_count / analysis.total_competitors
+            score -= major_ratio * 25  # Up to -25 points
+
+        # Penalize for high average reviews (established competitors)
+        if avg_reviews > 1000:
+            score -= 20
+        elif avg_reviews > 500:
+            score -= 15
+        elif avg_reviews > 200:
+            score -= 10
+        elif avg_reviews > 100:
+            score -= 5
+
+        # Penalize for concentrated market
+        if analysis.market_concentration == "monopolized":
+            score -= 20
+        elif analysis.market_concentration == "concentrated":
+            score -= 10
+
+        # Bonus for diverse market with small sellers
+        if analysis.small_seller_count >= analysis.total_competitors * 0.6:
+            score += 15  # 60%+ small sellers
+
+        # Bonus for low review counts (easier to compete)
+        if 0 < avg_reviews < 50:
+            score += 10
+
+        analysis.competitor_strength_score = max(0, min(100, score))
+
+        # Determine opportunity level
+        if analysis.competitor_strength_score >= 75:
+            analysis.opportunity_level = "excellent"
+        elif analysis.competitor_strength_score >= 60:
+            analysis.opportunity_level = "good"
+        elif analysis.competitor_strength_score >= 40:
+            analysis.opportunity_level = "moderate"
+        else:
+            analysis.opportunity_level = "poor"
+
+        return analysis
 
     def get_result_count(self, soup: BeautifulSoup) -> int:
         """Extract result count from search page"""
@@ -323,12 +536,16 @@ class NicheFinder:
             # Analyze products
             products = self.analyze_products(keyword, soup)
 
+            # Analyze competitors
+            competitor_analysis = self.analyze_competitors(products)
+
             # Calculate niche metrics
             niche = NicheData(
                 keyword=keyword,
                 result_count=result_count,
                 depth_level=depth,
-                parent_keyword=parent
+                parent_keyword=parent,
+                competitor_analysis=competitor_analysis
             )
 
             # Price analysis
@@ -356,6 +573,7 @@ class NicheFinder:
             niche.competition_score = self._calculate_competition_score(result_count)
             niche.price_score = self._calculate_price_score(niche.avg_price)
             niche.demand_score = self._calculate_demand_score(niche.avg_reviews, niche.bestseller_count)
+            niche.competitor_score = competitor_analysis.competitor_strength_score
             niche.overall_score = self._calculate_overall_score(niche)
 
             return niche
@@ -441,7 +659,8 @@ class NicheFinder:
             niche.competition_score * SCORE_WEIGHTS['competition'] +
             niche.price_score * SCORE_WEIGHTS['price'] +
             niche.demand_score * SCORE_WEIGHTS['reviews'] +
-            niche.specificity_score * SCORE_WEIGHTS['specificity']
+            niche.specificity_score * SCORE_WEIGHTS['specificity'] +
+            niche.competitor_score * SCORE_WEIGHTS['competitor_strength']
         )
         return round(score, 2)
 
@@ -514,7 +733,10 @@ class NicheFinder:
             writer = csv.DictWriter(f, fieldnames=[
                 'keyword', 'overall_score', 'result_count', 'avg_price', 'price_range',
                 'avg_reviews', 'avg_rating', 'bestseller_count', 'competition_score',
-                'price_score', 'demand_score', 'specificity_score', 'depth_level', 'parent_keyword'
+                'price_score', 'demand_score', 'specificity_score', 'competitor_score',
+                'amazon_brand_count', 'major_brand_count', 'small_seller_count',
+                'market_concentration', 'barrier_to_entry', 'opportunity_level',
+                'dominant_brands', 'depth_level', 'parent_keyword'
             ])
             writer.writeheader()
             for niche in niches:
@@ -594,6 +816,41 @@ class NicheFinder:
                 print(f"   🏆 {niche.bestseller_count} bestseller(s) in results")
 
             print(f"   Specificity: {niche.specificity_score:.1f} (more specific = better niche)")
+
+            # Competitor Analysis
+            if niche.competitor_analysis:
+                comp = niche.competitor_analysis
+
+                # Opportunity indicator
+                opp_emoji = {
+                    "excellent": "🟢",
+                    "good": "🟡",
+                    "moderate": "🟠",
+                    "poor": "🔴"
+                }.get(comp.opportunity_level, "⚪")
+
+                print(f"   {opp_emoji} Competitor Strength: {comp.competitor_strength_score:.1f}/100 ({comp.opportunity_level.upper()} opportunity)")
+
+                # Market details
+                if comp.amazon_brand_count > 0:
+                    print(f"      ⚠️  Amazon Brands: {comp.amazon_brand_count}/{comp.total_competitors} products")
+                if comp.major_brand_count > 0:
+                    print(f"      ⚠️  Major Brands: {comp.major_brand_count}/{comp.total_competitors} products")
+                if comp.small_seller_count > 0:
+                    print(f"      ✅ Small Sellers: {comp.small_seller_count}/{comp.total_competitors} products")
+
+                # Market characteristics
+                print(f"      Market: {comp.market_concentration.capitalize()}")
+                print(f"      Barrier to Entry: {comp.barrier_to_entry.replace('_', ' ').title()}")
+
+                # Dominant brands
+                if comp.dominant_brands:
+                    print(f"      Top Brands: {', '.join(comp.dominant_brands[:3])}")
+
+                # Competitor strength
+                if comp.avg_competitor_reviews:
+                    print(f"      Avg Competitor Reviews: {comp.avg_competitor_reviews:,}")
+
             print(f"   Depth: Level {niche.depth_level}")
 
             if niche.parent_keyword:
@@ -606,6 +863,11 @@ class NicheFinder:
         print()
 
         # Best by category
+        best_overall = top_niches[0]
+        print(f"   ⭐ BEST OVERALL: {best_overall.keyword}")
+        print(f"      └─ Score: {best_overall.overall_score:.1f}/100")
+        print()
+
         best_price = max(top_niches, key=lambda x: x.price_score)
         print(f"   💰 Best Revenue Potential: {best_price.keyword}")
         print(f"      └─ ${best_price.avg_price:.2f} avg price")
@@ -619,6 +881,13 @@ class NicheFinder:
         best_demand = max(top_niches, key=lambda x: x.demand_score)
         print(f"   🔥 Best Demand Indicators: {best_demand.keyword}")
         print(f"      └─ {best_demand.avg_reviews} avg reviews, {best_demand.bestseller_count} bestsellers")
+        print()
+
+        best_competitor = max(top_niches, key=lambda x: x.competitor_score)
+        print(f"   🥊 Weakest Competitors: {best_competitor.keyword}")
+        if best_competitor.competitor_analysis:
+            comp = best_competitor.competitor_analysis
+            print(f"      └─ {comp.small_seller_count}/{comp.total_competitors} small sellers, {comp.barrier_to_entry.replace('_', ' ')} barrier to entry")
         print()
 
         # Suggestions
